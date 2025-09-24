@@ -92,7 +92,7 @@ def main():
         print("Создайте .env с MOUSER_API_KEY=... (или экспортируйте переменную окружения) и запустите снова.")
         return
 
-    results: List[Dict[str, Any]] = []
+    results_map: Dict[str, Dict[str, Any]] = {}
     save_raw_dir: Path | None = None
 
     while True:
@@ -120,34 +120,35 @@ def main():
                 print(f"  → Ищу: {pn} ...")
                 row = _lookup_one(pn, api_key, retries=3, timeout=20, save_raw_dir=save_raw_dir)
                 if row:
-                    results.append(row)
+                    key = pn.strip().lower()
+                    results_map[key] = row
 
-            if results:
+            if results_map:
                 print("\nРезультаты:")
-                print_table(results)
+                print_table(list(results_map.values()))
             else:
                 print("  ⚠️  Пусто — нет валидных результатов.")
 
         elif choice == "2":
-            if not results:
+            if not results_map:
                 print("  ⚠️  Нет данных для сохранения. Сначала выполните поиск (пункт 1).")
                 continue
             out = _ask("Имя файла CSV (по умолчанию: mouser_results.csv): ")
             out = out or "mouser_results.csv"
             try:
-                write_csv(results, out)
+                write_csv(list(results_map.values()), out)
                 print(f"  ✓ CSV сохранён → {out}")
             except Exception as e:
                 print(f"  ❌ Ошибка при сохранении CSV: {e}")
 
         elif choice == "3":
-            if not results:
+            if not results_map:
                 print("  ⚠️  Нет данных для сохранения. Сначала выполните поиск (пункт 1).")
                 continue
             out = _ask("Имя файла JSON (по умолчанию: mouser_results.json): ")
             out = out or "mouser_results.json"
             try:
-                _save_json(results, out)
+                _save_json(list(results_map.values()), out)
                 print(f"  ✓ JSON сохранён → {out}")
             except Exception as e:
                 print(f"  ❌ Ошибка при сохранении JSON: {e}")

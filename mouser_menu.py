@@ -15,10 +15,10 @@ from mouser_cli import (
     transform_strict,
     write_csv,
     print_table,
+    write_xlsx,
 )
 
 load_dotenv(find_dotenv(), override=False)
-
 
 def _ask(prompt: str) -> str:
     try:
@@ -101,6 +101,7 @@ def main():
         print("2) Сохранить последние результаты в CSV")
         print("3) Сохранить последние результаты в JSON")
         print("4) Указать папку для сохранения сырых ответов API (RAW)")
+        print("5) Сохранить последние результаты в XLSX")
         print("0) Выход")
         choice = _ask("\nВыберите пункт меню: ")
 
@@ -166,6 +167,15 @@ def main():
                     print(f"  ✓ RAW будут сохраняться в: {p}")
                 except Exception as e:
                     print(f"  ❌ Не удалось создать папку: {e}")
+        elif choice == "5":
+            if not results_map:
+                print("  ⚠️  Нет данных для сохранения. Сначала выполните поиск (пункт 1).")
+                continue
+            out = _ask("Имя файла XLSX (по умолчанию: mouser_results.xlsx): ") or "mouser_results.xlsx"
+            try:
+                write_xlsx(list(results_map.values()), out)
+            except Exception as e:
+                print(f"  ❌ Ошибка при сохранении XLSX: {e}")
         else:
             print("  ⚠️  Неверный выбор. Попробуйте ещё раз.")
 

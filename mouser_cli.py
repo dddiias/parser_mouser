@@ -10,6 +10,9 @@ from typing import Any, Dict, List, Optional, Iterable
 
 import requests
 from dotenv import load_dotenv, find_dotenv
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment
+from openpyxl.utils import get_column_letter
 
 API_PARTNUMBER = "https://api.mouser.com/api/v1.0/search/partnumber"
 API_KEYWORD    = "https://api.mouser.com/api/v1.0/search/keyword"
@@ -175,6 +178,57 @@ def _iter_input(parts_from_cli: List[str], input_file: Optional[str]) -> Iterabl
     for x in parts_from_cli:
         yield x
 
+def _to_number_or_text(value):
+    if value is None:
+        return None
+    s = str(value).strip()
+    if s.isdigit():
+        try:
+            return int(s)
+        except Exception:
+            return s
+    try:
+        if s.startswith("$") or s.startswith("€") or s.startswith("£"):
+            s2 = s[1:]
+        else:
+            s2 = s
+        return float(s2.replace(",", ""))
+    except Exception:
+        return s
+
+def write_xlsx(rows: List[Dict[str, Any]], out_path: str) -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Mouser"
+
+    cols = list(rows[0].keys())
+    header_font = Font(bold=True)
+    ws.append(cols)
+    for col_idx, col_name in enumerate(cols, start=1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+
+    for r in rows:
+        out_row = []
+        for c in cols:
+            out_row.append(_to_number_or_text(r.get(c)))
+        ws.append(out_row)
+
+    ws.freeze_panes = "A2"
+
+    for col_idx, col_name in enumerate(cols, start=1):
+        max_len = len(str(col_name))
+        for row_idx in range(2, ws.max_row + 1):
+            val = ws.cell(row=row_idx, column=col_idx).value
+            if val is None:
+                continue
+            max_len = max(max_len, len(str(val)))
+        ws.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 2, 60)
+
+    wb.save(out_path)
+    print(f"Wrote XLSX -> {out_path}")
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -182,7 +236,7 @@ def main():
     )
     parser.add_argument("part_numbers", nargs="*", help="PNs (Mouser or Manufacturer)")
     parser.add_argument("--input", help="Path to file with PNs (txt/csv, one PN per line or first column)")
-    parser.add_argument("--format", choices=["table", "csv", "json"], default="table")
+    parser.add_argument("--format", choices=["table", "csv", "json", "xlsx"], default="table")
     parser.add_argument("--out", help="Output file path for csv/json")
     parser.add_argument("--raw", action="store_true", help="Print raw JSON to stdout")
     parser.add_argument("--save-raw", help="Directory to save raw JSON responses per PN")
@@ -251,6 +305,9 @@ def main():
         out_path = args.out or "mouser_results.csv"
         write_csv(results, out_path)
         print(f"Wrote CSV -> {out_path}")
+    elif args.format == "xlsx":
+        out_path = args.out or "mouser_results.xlsx"
+        write_xlsx(results, out_path)
     else:
         print_table(results)
 
